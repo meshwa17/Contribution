@@ -1,0 +1,511 @@
+/**
+ * Simple Vertical Timeline with Slider for Elementor
+ *
+ * Colors, sizes and spacing are driven by CSS custom properties (all prefixed "--vtws-").
+ * Elementor writes the "--vtws-l-*" (light) and "--vtws-d-*" (dark) values from the widget controls.
+ * Layout switches use the classes "vtws--tablet" and "vtws--mobile", which the script
+ * toggles based on the breakpoints chosen in the widget settings.
+ */
+
+/* ==========================================================================
+   Base + design tokens
+   ========================================================================== */
+.vtws,
+.vtws *,
+.vtws *::before,
+.vtws *::after {
+	box-sizing: border-box;
+}
+
+.vtws {
+	/* Structural tokens (overridable from Elementor controls). */
+	--vtws-dot: 26px;
+	--vtws-pad: 12px;
+	--vtws-rail: 4px;
+	--vtws-scale: 1.15;
+	--vtws-btn: 42px;
+	--vtws-btn-icon: 18px;
+	--vtws-btn-radius: 50%;
+	--vtws-track-w: 260px;
+
+	/* Light palette. */
+	--vtws-accent: var(--vtws-l-accent, #0aa5e8);
+	--vtws-accent-text: var(--vtws-l-accent-text, #0786bd);
+	--vtws-bg: var(--vtws-l-bg, #ffffff);
+	--vtws-heading: var(--vtws-l-heading, #0f1b2d);
+	--vtws-text: var(--vtws-l-text, #475569);
+	--vtws-inactive: var(--vtws-l-inactive, #8493a6);
+	--vtws-rail-c: var(--vtws-l-rail, #d5dde6);
+	--vtws-dot-bg: var(--vtws-l-dot-bg, #ffffff);
+	--vtws-panel-bg: var(--vtws-l-panel-bg, #f1f5f9);
+	--vtws-stat-bg: var(--vtws-l-stat-bg, #ffffff);
+	--vtws-line: var(--vtws-l-line, #d5dde6);
+
+	position: relative;
+	display: block;
+	width: 100%;
+	max-width: 1040px;
+	margin: 0 auto;
+	padding: clamp(24px, 4vw, 48px) clamp(16px, 4vw, 48px);
+	border-radius: 18px;
+	background: var(--vtws-bg);
+	box-shadow: 0 10px 30px rgba(15, 27, 45, 0.08);
+	color: var(--vtws-heading);
+	font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Dark palette (only when "Auto Dark Mode" is enabled in the widget). */
+@media (prefers-color-scheme: dark) {
+	.vtws--auto-dark {
+		--vtws-accent: var(--vtws-d-accent, #0aa5e8);
+		--vtws-accent-text: var(--vtws-d-accent-text, #0aa5e8);
+		--vtws-bg: var(--vtws-d-bg, #131c2c);
+		--vtws-heading: var(--vtws-d-heading, #f1f5f9);
+		--vtws-text: var(--vtws-d-text, #b4c0d0);
+		--vtws-inactive: var(--vtws-d-inactive, #7d8ba0);
+		--vtws-rail-c: var(--vtws-d-rail, #2b384d);
+		--vtws-dot-bg: var(--vtws-d-dot-bg, #131c2c);
+		--vtws-panel-bg: var(--vtws-d-panel-bg, #192438);
+		--vtws-stat-bg: var(--vtws-d-stat-bg, #131c2c);
+		--vtws-line: var(--vtws-d-line, #2b384d);
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+	}
+}
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+.vtws__head {
+	margin-bottom: clamp(24px, 4vw, 40px);
+	text-align: center;
+}
+
+.vtws__eyebrow {
+	display: inline-block;
+	margin-bottom: 12px;
+	padding: 6px 14px;
+	border-radius: 99px;
+	background: rgba(10, 165, 232, 0.12);
+	background: color-mix(in srgb, var(--vtws-accent) 12%, transparent);
+	color: var(--vtws-accent-text);
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.14em;
+	line-height: 1.4;
+	text-transform: uppercase;
+}
+
+.vtws__heading {
+	margin: 0;
+	padding: 0;
+	color: var(--vtws-heading);
+	font-size: clamp(26px, 4vw, 38px);
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+}
+
+/* ==========================================================================
+   Layout: vertical timeline (left) + slide panel (right)
+   ========================================================================== */
+.vtws__layout {
+	display: grid;
+	grid-template-columns: minmax(0, var(--vtws-track-w)) minmax(0, 1fr);
+	gap: 32px;
+	align-items: start;
+}
+
+.vtws--tablet .vtws__layout {
+	grid-template-columns: minmax(0, 1fr);
+	gap: 24px;
+}
+
+.vtws__panels {
+	min-width: 0;
+}
+
+/* ==========================================================================
+   Vertical track
+   ========================================================================== */
+.vtws__track {
+	position: relative;
+}
+
+.vtws__item {
+	position: relative;
+	margin: 0;
+}
+
+/* Connector line from this dot down to the next one. */
+.vtws__item:not(:last-child)::before {
+	content: "";
+	position: absolute;
+	z-index: 0;
+	top: calc(var(--vtws-pad) + (var(--vtws-dot) / 2));
+	left: calc((var(--vtws-dot) / 2) - (var(--vtws-rail) / 2));
+	width: var(--vtws-rail);
+	height: 100%;
+	border-radius: var(--vtws-rail);
+	background: var(--vtws-rail-c);
+	transition: background-color 0.4s;
+}
+
+.vtws__item.is-done:not(:last-child)::before {
+	background: var(--vtws-accent);
+}
+
+/* Node button. The resets protect against theme / Elementor Kit button styles. */
+.vtws .vtws__node {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	align-items: flex-start;
+	gap: 14px;
+	width: 100%;
+	min-height: 0;
+	margin: 0;
+	padding: var(--vtws-pad) 0;
+	border: 0;
+	border-radius: 12px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--vtws-inactive);
+	cursor: pointer;
+	font: inherit;
+	letter-spacing: normal;
+	line-height: normal;
+	text-align: left;
+	text-decoration: none;
+	text-transform: none;
+}
+
+.vtws .vtws__node:hover,
+.vtws .vtws__node:focus {
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--vtws-inactive);
+	text-decoration: none;
+}
+
+.vtws .vtws__node:focus-visible {
+	outline: 3px solid var(--vtws-accent);
+	outline-offset: 4px;
+}
+
+.vtws__dot {
+	display: block;
+	flex-shrink: 0;
+	width: var(--vtws-dot);
+	height: var(--vtws-dot);
+	border: 4px solid var(--vtws-rail-c);
+	border-radius: 50%;
+	background: var(--vtws-dot-bg);
+	transition: all 0.3s;
+}
+
+.vtws__text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.vtws__yr {
+	display: block;
+	color: var(--vtws-inactive);
+	font-size: clamp(16px, 2.4vw, 22px);
+	font-weight: 700;
+	line-height: var(--vtws-dot);
+	transition: color 0.3s;
+}
+
+.vtws__nm {
+	display: block;
+	color: var(--vtws-inactive);
+	font-size: 14px;
+	line-height: 1.3;
+	text-align: left;
+	transition: color 0.3s;
+}
+
+.vtws__node:hover .vtws__dot {
+	border-color: var(--vtws-accent);
+}
+
+.vtws__node.is-done .vtws__dot {
+	border-color: var(--vtws-accent);
+	background: var(--vtws-accent);
+}
+
+.vtws__node.is-on .vtws__dot {
+	border-color: var(--vtws-accent);
+	background: var(--vtws-dot-bg);
+	box-shadow: 0 0 0 7px rgba(10, 165, 232, 0.12);
+	box-shadow: 0 0 0 7px color-mix(in srgb, var(--vtws-accent) 14%, transparent);
+	transform: scale(var(--vtws-scale));
+}
+
+.vtws__node.is-done .vtws__yr,
+.vtws__node.is-on .vtws__yr,
+.vtws__node.is-on .vtws__nm {
+	color: var(--vtws-accent-text);
+}
+
+.vtws__node.is-on .vtws__nm {
+	font-weight: 600;
+}
+
+/* ==========================================================================
+   Panel
+   ========================================================================== */
+.vtws__panel {
+	position: relative;
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 24px 32px;
+	align-items: center;
+	overflow: hidden;
+	padding: clamp(20px, 3.5vw, 36px);
+	border-radius: 16px;
+	background: var(--vtws-panel-bg);
+}
+
+.vtws__panel[hidden] {
+	display: none;
+}
+
+.vtws__panel--no-stat {
+	grid-template-columns: 1fr;
+}
+
+.vtws__panel.is-anim {
+	animation: vtws-in 0.45s ease;
+}
+
+@keyframes vtws-in {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.vtws__ghost {
+	position: absolute;
+	top: -14px;
+	right: 20px;
+	color: var(--vtws-heading);
+	font-size: clamp(70px, 13vw, 150px);
+	font-weight: 800;
+	line-height: 1;
+	opacity: 0.045;
+	pointer-events: none;
+	user-select: none;
+}
+
+.vtws__body {
+	position: relative;
+	min-width: 0;
+	text-align: left;
+}
+
+.vtws__chip {
+	display: inline-block;
+	margin-bottom: 12px;
+	padding: 5px 12px;
+	border-radius: 99px;
+	background: rgba(10, 165, 232, 0.12);
+	background: color-mix(in srgb, var(--vtws-accent) 12%, transparent);
+	color: var(--vtws-accent-text);
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.4;
+}
+
+.vtws__ttl {
+	margin: 0 0 10px;
+	padding: 0;
+	color: var(--vtws-heading);
+	font-size: clamp(19px, 2.6vw, 24px);
+	font-weight: 700;
+	line-height: 1.3;
+}
+
+.vtws__txt {
+	max-width: 62ch;
+	color: var(--vtws-text);
+	font-size: 15px;
+	line-height: 1.75;
+}
+
+.vtws__txt p {
+	margin: 0 0 0.8em;
+}
+
+.vtws__txt p:last-child {
+	margin-bottom: 0;
+}
+
+/* ==========================================================================
+   Highlight (stat) box
+   ========================================================================== */
+.vtws__stat {
+	position: relative;
+	min-width: 160px;
+	padding: 22px 20px;
+	border-radius: 14px;
+	background: var(--vtws-stat-bg);
+	box-shadow: 0 4px 14px rgba(15, 27, 45, 0.06);
+	text-align: center;
+}
+
+.vtws__stat-num {
+	display: block;
+	margin-bottom: 6px;
+	color: var(--vtws-accent);
+	font-size: clamp(28px, 4vw, 38px);
+	font-weight: 800;
+	line-height: 1.1;
+}
+
+.vtws__stat-lbl {
+	display: block;
+	color: var(--vtws-text);
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+/* ==========================================================================
+   Footer (counter + buttons)
+   ========================================================================== */
+.vtws__foot {
+	position: relative;
+	display: flex;
+	grid-column: 1 / -1;
+	align-items: center;
+	justify-content: space-between;
+	padding-top: 16px;
+	border-top: 1px solid var(--vtws-line);
+}
+
+.vtws__count {
+	margin-right: auto;
+	color: var(--vtws-inactive);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+
+.vtws__nav {
+	display: flex;
+	gap: 8px;
+	margin-left: auto;
+}
+
+.vtws .vtws__nav .vtws__btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--vtws-btn);
+	height: var(--vtws-btn);
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	border: 1px solid var(--vtws-line);
+	border-radius: var(--vtws-btn-radius);
+	background: var(--vtws-dot-bg);
+	box-shadow: none;
+	color: var(--vtws-heading);
+	cursor: pointer;
+	line-height: 1;
+	transition: all 0.2s;
+}
+
+.vtws .vtws__nav .vtws__btn:hover:not(:disabled),
+.vtws .vtws__nav .vtws__btn:focus-visible:not(:disabled) {
+	border-color: var(--vtws-accent);
+	background: var(--vtws-accent);
+	color: #ffffff;
+}
+
+.vtws .vtws__nav .vtws__btn:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+
+.vtws .vtws__nav .vtws__btn:focus-visible {
+	outline: 3px solid var(--vtws-accent);
+	outline-offset: 2px;
+}
+
+.vtws__btn svg {
+	width: var(--vtws-btn-icon);
+	height: var(--vtws-btn-icon);
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+/* ==========================================================================
+   Tablet layout (class added by script, breakpoint set in widget settings)
+   ========================================================================== */
+.vtws--tablet .vtws__panel {
+	grid-template-columns: 1fr;
+}
+
+.vtws--tablet .vtws__stat {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 16px 18px;
+	text-align: left;
+}
+
+.vtws--tablet .vtws__stat-num {
+	margin: 0;
+	font-size: 28px;
+}
+
+/* ==========================================================================
+   Mobile layout: vertical accordion (panel opens under its node)
+   ========================================================================== */
+.vtws--mobile .vtws__panel {
+	gap: 14px;
+	margin: 2px 0 14px calc(var(--vtws-dot) + 14px);
+	padding: 18px 16px 14px;
+}
+
+.vtws--mobile .vtws__txt {
+	font-size: 14px;
+	line-height: 1.7;
+}
+
+.vtws--mobile .vtws__ghost {
+	top: -4px;
+	right: 10px;
+	font-size: 64px;
+}
+
+.vtws--mobile .vtws__foot {
+	padding-top: 12px;
+}
+
+.vtws--mobile {
+	--vtws-btn: 38px;
+}
+
+/* ==========================================================================
+   Reduced motion
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+	.vtws *,
+	.vtws *::before,
+	.vtws *::after {
+		animation: none !important;
+		transition: none !important;
+	}
+}
